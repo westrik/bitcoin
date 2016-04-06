@@ -38,6 +38,7 @@ import numpy as np
 import sklearn
 import sklearn.cluster
 
+
 def load(filename):
     """
     Load csv training file of form: unix_timestamp, price, num_bid, num_ask
@@ -127,7 +128,7 @@ def cluster(data):
 
 def similarity(a, b):
     """
-    Calculate similarity metric
+    Calculate similarity metric (as defined by S&Z)
 
     s(a, b) = (Σ z=1→M (a_z - mean(a))(b_z - mean(b)))/(M*std(a)*std(b))
     """
@@ -150,6 +151,7 @@ def predict(prices, clusters):
     """
     Predict ∆p (change in price prior to interval) using Bayesian regression:
 
+    ∆pⱼ = y • (exp(c(x,xᵢ))))/(Σ i=1→n (exp(c(x,xᵢ)))) 
     ∆pⱼ = Σ i=1→n (yᵢ * exp(c(x,xᵢ))))/(Σ i=1→n (exp(c(x,xᵢ))))
     """
 
@@ -163,18 +165,15 @@ def predict(prices, clusters):
     elif len_interval == 180:
         cluster = 0
     else:
-        raise Exception ("Vector is wrong size")
+        raise Exception ("Vector is wrong size: "+str(len_interval))
     
     # S&Z doesn't discuss how to select c, TODO experiment
     c, numerator, denominator = 1, 0, 0
     
     for i in range(0, num_clusters):
-        distance = np.exp(c*similarity(prices, clusters[cluster][i][0:len_interval]))
+        distance = np.exp(c*similarity(prices, clusters[cluster][0:len_interval]))
         numerator += distance*1#TODO
         denominator += distance
-
-    if len(prices) != len(cluster):
-        raise Exception("Numbers are not aligned correctly")
 
 
 def train(training_data, clusters):
@@ -184,8 +183,22 @@ def train(training_data, clusters):
         ∆p = w₀ + w₁∆p₁ + w₂∆p₂ + w₃∆p₃ + w₄r
     """
 
+    vals = np.zeros((len(training_data)-720,4))
+
+    # Iterate through training data, at each point try to predict price
+    seq = lambda n: [x[1] for x in training_data[i-n:i]]
+    for i in range(720, len(training_data)):
+        p1 = predict(seq(180), clusters[0])
+        p2 = predict(seq(360), clusters[1])
+        p3 = predict(seq(720), clusters[2])
+        ask = training_data[i][2]
+        bid = training_data[i][3]
+        r = (bid-ask)/(bid+ask)
+
+        vals[i][0:3] = [p1,p2,p3,r]
 
 
+# Train the model
 if __name__=="__main__":
     if (len(sys.argv)) == 1:
         print "Need csv"
