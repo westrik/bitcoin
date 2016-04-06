@@ -2,7 +2,7 @@
 
 """
 Bitcoin trading bot
-    Predict Bitcoin price changes using Bayesian regression 
+    Predict Bitcoin price changes using Bayesian regression
     Implementation closely follows http://arxiv.org/abs/1410.1231
 
 -------------------
@@ -13,21 +13,21 @@ Training and usage:
 * Split data into three groups:
 
 * First group:
-   Create subgroups of 30/60/120 minutes, along with price change immediately 
+   Create subgroups of 30/60/120 minutes, along with price change immediately
     following each interval (10 sec)
    Cluster with k-means (100 groups)
    Pick 20 highest performing clusters
 
 * Second group:
    Create subgroups of 30/60/120 minutes
-   Use Bayesian regression with 20 clusters to predict price change for 
+   Use Bayesian regression with 20 clusters to predict price change for
        intervals in second group
    Fit weights from ∆p model function to predicted data
 
 * Third group:
    Test fitted ∆p model:
-   For a given data point, estimate ∆p for 30/60/120 minutes prior to data 
-       point, plug estimations into ∆p model. Compare ∆p to threshold to make 
+   For a given data point, estimate ∆p for 30/60/120 minutes prior to data
+       point, plug estimations into ∆p model. Compare ∆p to threshold to make
        trade decision
 """
 
@@ -80,35 +80,55 @@ def split_into_intervals(data, n):
 
 def cluster(data):
     """
-    Use k-means clustering on training data to find profitable patterns 
+    Use k-means clustering on training data to find profitable patterns
     we can exploit
     """
 
-    num_clusters = 20
+    num_clusters = 100
+    num_selected_clusters = 20
 
     # Split into 30, 60, and 120 min time intervals, cluster each
-
     split = lambda n: split_into_intervals(data, n)
     kmeans30 = sklearn.cluster.k_means(split(30), num_clusters)
     kmeans60 = sklearn.cluster.k_means(split(60), num_clusters)
     kmeans120 = sklearn.cluster.k_means(split(120), num_clusters)
 
-    # Also normalize the clusters so we can use the similarity function from  
-    #    S&Z to compare instead of L2 norm (faster)
-    # Only normalize m price data points, not ∆p
-
-    scaler = sklearn.preprocessing.StandardScaler()
+    # Sort the clusters by performance
+    hp30, hp60, hp120 = [], [], []
     for i in range(0, num_clusters):
-        kmeans30[0][i,0:180] = scaler.fit_transform(kmeans30[0][i,0:180])
-        kmeans60[0][i,0:360] = scaler.fit_transform(kmeans60[0][i,0:360])
-        kmeans120[0][i,0:720] = scaler.fit_transform(kmeans120[0][i,0:720])
+        hp30.append((i,kmeans30[0][i,-1]))
+        hp60.append((i,kmeans60[0][i,-1]))
+        hp120.append((i,kmeans120[0][i,-1]))
 
-    return [kmeans30, kmeans60, kmeans120]
+    hp30 = sorted(hp30, key=lambda x: x[1])[0:num_selected_clusters]
+    hp60 = sorted(hp60, key=lambda x: x[1])[0:num_selected_clusters]
+    hp60 = sorted(hp120, key=lambda x: x[1])[0:num_selected_clusters]
+    
+    # Select the highest performing clusters
+    top30 = np.zeros((num_selected_clusters,180))
+    top60 = np.zeros((num_selected_clusters,360))
+    top120 = np.zeros((num_selected_clusters,720))
+    
+    for i in range(0, num_selected_clusters):
+        top30[i,0:180] = kmeans30[0][hp30[i][0],0:180]
+        top60[i,0:360] = kmeans60[0][hp60[i][0],0:360]
+        top120[i,0:720] = kmeans120[0][hp120[i][0],0:720]
+
+    # Then normalize the clusters so we can use the faster similarity function
+    #    from S&Z to compare instead of L2 norm
+    scaler = sklearn.preprocessing.StandardScaler()
+    for i in range(0, num_selected_clusters):
+        top30[i,0:180] = scaler.fit_transform(top30[i,0:180])
+        top60[i,0:360] = scaler.fit_transform(top60[i,0:360])
+        top120[i,0:720] = scaler.fit_transform(top120[i,0:720])
+
+    return [top30, top60, top120]
 
 
 def similarity(a, b):
     """
     Calculate similarity metric
+
     s(a, b) = (Σ z=1→M (a_z - mean(a))(b_z - mean(b)))/(M*std(a)*std(b))
     """
 
@@ -119,26 +139,46 @@ def similarity(a, b):
 
     numerator = np.sum((np.subtract(a, np.mean(a)))*(np.subtract(b, np.mean(b))))
     denominator = len(a)*np.std(a)*np.std(b)
-    
-    if (denonimator == 0):
+
+    if (denominator == 0):
        return numerator
-       
+
     return numerator / denominator
 
 
-def predict(prices, cluster):
+def predict(prices, clusters):
     """
     Predict ∆p (change in price prior to interval) using Bayesian regression:
 
     ∆pⱼ = Σ i=1→n (yᵢ * exp(c(x,xᵢ))))/(Σ i=1→n (exp(c(x,xᵢ))))
     """
 
+    num_clusters = len(clusters)
+    len_interval = len(prices)
+
+    if len_interval == 720:
+        cluster = 2
+    elif len_interval == 360:
+        cluster = 1
+    elif len_interval == 180:
+        cluster = 0
+    else:
+        raise Exception ("Vector is wrong size")
+    
+    # S&Z doesn't discuss how to select c, TODO experiment
+    c, numerator, denominator = 1, 0, 0
+    
+    for i in range(0, num_clusters):
+        distance = np.exp(c*similarity(prices, clusters[cluster][i][0:len_interval]))
+        numerator += distance*1#TODO
+        denominator += distance
+
     if len(prices) != len(cluster):
         raise Exception("Numbers are not aligned correctly")
 
 
 def train(training_data, clusters):
-    """ 
+    """
     Use B.regression with clustered data to predict new dataset
     Then use those predicted vals to fit our weights to:
         ∆p = w₀ + w₁∆p₁ + w₂∆p₂ + w₃∆p₃ + w₄r
