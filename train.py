@@ -41,6 +41,9 @@ import sklearn
 import sklearn.cluster
 
 def load(filename):
+    """
+    Load csv training file of form: unix_timestamp, price, num_bid, num_ask
+    """
     csv = np.genfromtxt(\
             filename, \
             dtype=[('time','i8'),('price','f8'),('bid','f8'),('ask','f8')], \
@@ -78,17 +81,47 @@ def split_into_intervals(data, n):
 
 
 def cluster(data):
-    # split into 30, 60, and 120 min time intervals, cluster each
-    
-    kmeans30 = sklearn.cluster.k_means(split_into_intervals(data, 30), 20)
-    kmeans60 = sklearn.cluster.k_means(split_into_intervals(data, 60), 20)
-    kmeans120 = sklearn.cluster.k_means(split_into_intervals(data, 120), 20)
+    """
+    Use k-means clustering on training data to find profitable patterns 
+    we can exploit
+    """
+
+    num_clusters = 20
+
+    # Split into 30, 60, and 120 min time intervals, cluster each
+    # TODO: normalize the data so we can use the similarity function 
+    #    to compare instead of L2 norm (expensive)
+
+    split = lambda n: split_into_intervals(data, n)
+
+    kmeans30 = sklearn.cluster.k_means(split(30), num_clusters)
+    kmeans60 = sklearn.cluster.k_means(split(60), num_clusters)
+    kmeans120 = sklearn.cluster.k_means(split(120), num_clusters)
 
     return [kmeans30, kmeans60, kmeans120]
 
 
-def train(training_data, clusters):
+def predict(prices, cluster):
+    """
+    Predict ∆p (change in price prior to interval) using Bayesian regression:
+
+    ∆pⱼ = Σ i=1→n (yᵢ * exp(c(x,xᵢ))))/(Σ i=1→n (exp(c(x,xᵢ))))
+    """
     pass
+
+
+def train(training_data, clusters):
+    """ 
+    Use B.regression with clustered data to predict new dataset
+    Then use those predicted vals to fit our weights to:
+        ∆p = w₀ + w₁∆p₁ + w₂∆p₂ + w₃∆p₃ + w₄r
+    """
+    pass
+
+
+
+
+
 
 
 if __name__=="__main__":
