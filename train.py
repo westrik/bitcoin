@@ -38,7 +38,7 @@ import sys
 
 import numpy as np
 import sklearn
-from sklearn.cluster import KMeans
+import sklearn.cluster
 
 def load(filename):
     csv = np.genfromtxt(\
@@ -53,14 +53,38 @@ def load(filename):
     return csv
 
 
-def split_into_intervals(data):
-    pass
+def split_into_intervals(data, n):
+    """
+    Split time series into n minute intervals
+    """
+    # Throw away time, bid/ask numbers
+    prices =  [x[1] for x in data]
+
+    # create a len n-1 array of price differences (10 second increments)
+    price_diffs = np.diff(prices)
+
+    # m = interval length in terms of data points (6*~10sec = 1 minute)
+    m = n * 6
+
+    # each datapoint we're trying to cluster will be of the form:
+    #     (xi,yi) = (time series of prices, price change after series)
+    intervals = np.zeros((len(prices)-1,m+2))
+
+    for i in range(0, len(prices)-m-1):
+        intervals[i,0:m] = prices[i:i+m]
+        intervals[i,m+1] = price_diffs[i+m]
+
+    return intervals
 
 
 def cluster(data):
-    # split into 30, 60, and 120 min time intervals
-    pass
-    #sklearn.cluster.k_means(data,100)
+    # split into 30, 60, and 120 min time intervals, cluster each
+    
+    kmeans30 = sklearn.cluster.k_means(split_into_intervals(data, 30), 20)
+    kmeans60 = sklearn.cluster.k_means(split_into_intervals(data, 60), 20)
+    kmeans120 = sklearn.cluster.k_means(split_into_intervals(data, 120), 20)
+
+    return [kmeans30, kmeans60, kmeans120]
 
 
 def train(training_data, clusters):
