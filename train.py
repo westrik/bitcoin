@@ -104,16 +104,16 @@ def cluster(data):
     hp30 = sorted(hp30, key=lambda x: x[1])[0:num_selected_clusters]
     hp60 = sorted(hp60, key=lambda x: x[1])[0:num_selected_clusters]
     hp60 = sorted(hp120, key=lambda x: x[1])[0:num_selected_clusters]
-    
+
     # Select the highest performing clusters
-    top30 = np.zeros((num_selected_clusters,180))
-    top60 = np.zeros((num_selected_clusters,360))
-    top120 = np.zeros((num_selected_clusters,720))
-    
+    top30 = np.zeros((num_selected_clusters,181))
+    top60 = np.zeros((num_selected_clusters,361))
+    top120 = np.zeros((num_selected_clusters,721))
+
     for i in range(0, num_selected_clusters):
-        top30[i,0:180] = kmeans30[0][hp30[i][0],0:180]
-        top60[i,0:360] = kmeans60[0][hp60[i][0],0:360]
-        top120[i,0:720] = kmeans120[0][hp120[i][0],0:720]
+        top30[i,0:180] = kmeans30[0][hp30[i][0],0:181]
+        top60[i,0:360] = kmeans60[0][hp60[i][0],0:361]
+        top120[i,0:720] = kmeans120[0][hp120[i][0],0:721]
 
     # Then normalize the clusters so we can use the faster similarity function
     #    from S&Z to compare instead of L2 norm
@@ -138,8 +138,8 @@ def similarity(a, b):
     elif len(a) == len(b) == 0:
 	raise Exception("Vectors are empty")
 
-    numerator = np.sum((np.subtract(a, np.mean(a)))*(np.subtract(b, np.mean(b))))
-    denominator = len(a)*np.std(a)*np.std(b)
+    numerator = np.sum((np.subtract(a[0:-1], np.mean(a[0:-1])))*(np.subtract(b, np.mean(b))))
+    denominator = len(a[0:-1])*np.std(a[0:-1])*np.std(b)
 
     if (denominator == 0):
        return numerator
@@ -151,7 +151,7 @@ def predict(prices, clusters):
     """
     Predict ∆p (change in price prior to interval) using Bayesian regression:
 
-    ∆pⱼ = y • (exp(c(x,xᵢ))))/(Σ i=1→n (exp(c(x,xᵢ)))) 
+    ∆pⱼ = y • (exp(c(x,xᵢ))))/(Σ i=1→n (exp(c(x,xᵢ))))
     ∆pⱼ = Σ i=1→n (yᵢ * exp(c(x,xᵢ))))/(Σ i=1→n (exp(c(x,xᵢ))))
     """
 
@@ -166,14 +166,16 @@ def predict(prices, clusters):
         cluster = 0
     else:
         raise Exception ("Vector is wrong size: "+str(len_interval))
-    
+
     # S&Z doesn't discuss how to select c, TODO experiment
     c, numerator, denominator = 1, 0, 0
-    
+
     for i in range(0, num_clusters):
         distance = np.exp(c*similarity(prices, clusters[cluster][0:len_interval]))
-        numerator += distance*1#TODO
+        numerator += distance*prices[-1]
         denominator += distance
+
+    return (numerator / denominator)
 
 
 def train(training_data, clusters):
