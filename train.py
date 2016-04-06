@@ -37,7 +37,6 @@ import sys
 import numpy as np
 import sklearn
 import sklearn.cluster
-import pprint
 
 def load(filename):
     """
@@ -100,9 +99,9 @@ def cluster(data):
 
     scaler = sklearn.preprocessing.StandardScaler()
     for i in range(0, num_clusters):
-        kmeans30[i][1][0:180] = scaler.fit_transform(kmeans30[i][1][0:180])
-        kmeans60[i][1][0:360] = scaler.fit_transform(kmeans60[i][1][0:360])
-        kmeans120[i][1][0:720] = scaler.fit_transform(kmeans120[i][1][0:720])
+        kmeans30[0][i,0:180] = scaler.fit_transform(kmeans30[0][i,0:180])
+        kmeans60[0][i,0:360] = scaler.fit_transform(kmeans60[0][i,0:360])
+        kmeans120[0][i,0:720] = scaler.fit_transform(kmeans120[0][i,0:720])
 
     return [kmeans30, kmeans60, kmeans120]
 
@@ -121,11 +120,10 @@ def similarity(a, b):
     numerator = np.sum((np.subtract(a, np.mean(a)))*(np.subtract(b, np.mean(b))))
     denominator = len(a)*np.std(a)*np.std(b)
     
-    if (denonimator == 0)
+    if (denonimator == 0):
        return numerator
        
     return numerator / denominator
-
 
 
 def predict(prices, cluster):
