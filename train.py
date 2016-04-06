@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 """
-
 Bitcoin trading bot
     Predict Bitcoin price changes using Bayesian regression 
     Implementation closely follows http://arxiv.org/abs/1410.1231
@@ -30,7 +29,6 @@ Training and usage:
    For a given data point, estimate ∆p for 30/60/120 minutes prior to data 
        point, plug estimations into ∆p model. Compare ∆p to threshold to make 
        trade decision
-
 """
 
 import csv
@@ -39,6 +37,7 @@ import sys
 import numpy as np
 import sklearn
 import sklearn.cluster
+import pprint
 
 def load(filename):
     """
@@ -89,16 +88,44 @@ def cluster(data):
     num_clusters = 20
 
     # Split into 30, 60, and 120 min time intervals, cluster each
-    # TODO: normalize the data so we can use the similarity function 
-    #    to compare instead of L2 norm (expensive)
 
     split = lambda n: split_into_intervals(data, n)
-
     kmeans30 = sklearn.cluster.k_means(split(30), num_clusters)
     kmeans60 = sklearn.cluster.k_means(split(60), num_clusters)
     kmeans120 = sklearn.cluster.k_means(split(120), num_clusters)
 
+    # Also normalize the clusters so we can use the similarity function from  
+    #    S&Z to compare instead of L2 norm (faster)
+    # Only normalize m price data points, not ∆p
+
+    scaler = sklearn.preprocessing.StandardScaler()
+    for i in range(0, num_clusters):
+        kmeans30[i][1][0:180] = scaler.fit_transform(kmeans30[i][1][0:180])
+        kmeans60[i][1][0:360] = scaler.fit_transform(kmeans60[i][1][0:360])
+        kmeans120[i][1][0:720] = scaler.fit_transform(kmeans120[i][1][0:720])
+
     return [kmeans30, kmeans60, kmeans120]
+
+
+def similarity(a, b):
+    """
+    Calculate similarity metric
+    s(a, b) = (Σ z=1→M (a_z - mean(a))(b_z - mean(b)))/(M*std(a)*std(b))
+    """
+
+    if len(a) != len(b):
+	raise Exception("Vectors are not aligned")
+    elif len(a) == len(b) == 0:
+	raise Exception("Vectors are empty")
+
+    numerator = np.sum((np.subtract(a, np.mean(a)))*(np.subtract(b, np.mean(b))))
+    denominator = len(a)*np.std(a)*np.std(b)
+    
+    if (denonimator == 0)
+       return numerator
+       
+    return numerator / denominator
+
 
 
 def predict(prices, cluster):
@@ -107,7 +134,9 @@ def predict(prices, cluster):
 
     ∆pⱼ = Σ i=1→n (yᵢ * exp(c(x,xᵢ))))/(Σ i=1→n (exp(c(x,xᵢ))))
     """
-    pass
+
+    if len(prices) != len(cluster):
+        raise Exception("Numbers are not aligned correctly")
 
 
 def train(training_data, clusters):
@@ -116,11 +145,6 @@ def train(training_data, clusters):
     Then use those predicted vals to fit our weights to:
         ∆p = w₀ + w₁∆p₁ + w₂∆p₂ + w₃∆p₃ + w₄r
     """
-    pass
-
-
-
-
 
 
 
