@@ -234,5 +234,5 @@ if __name__=="__main__":
     weights = train(train_data, clusters)
 
     # save weights and clusters for later usage
-    pickle.dump(clusters, open("clusters.pickle", "wb"))
-    pickle.dump(weights,  open("weights.pickle", "wb"))
+    pickle.dump(clusters, open("weights/clusters.pickle", "wb"))
+    pickle.dump(weights,  open("weights/weights.pickle", "wb"))
