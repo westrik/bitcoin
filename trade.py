@@ -49,7 +49,7 @@ if __name__=="__main__":
     try:
         clusters = pickle.load(open("clusters.pickle", "rb"))
         weights = pickle.load(open("weights.pickle", "rb"))
-        #weights = [-0.0024777, 0.0167803, 0.17338413, -0.39617103, 0.00334607]
+        #weights = [0.02085571, -1.1125847, 0.09749599, -1.56908484, 0.00331902]
         #weights = [-0.00570016, -0.2617486, -0.63571931, 0.13415341, 0.00337089]
     except:
         print "Generate weights and clusters with train.py"

@@ -137,9 +137,11 @@ def similarity(a, b):
     elif len(a) == len(b) == 0:
 	raise Exception("Vectors are empty")
 
-    numerator = 0
-    for z in range(0, len(a)):
-        numerator += (a[z]-np.mean(a))*(b[z]-np.mean(b))
+
+    numerator = np.sum((np.subtract(a, np.mean(a)))*(np.subtract(b, np.mean(b))))
+    #numerator = 0
+    #for z in range(0, len(a)):
+    #    numerator += (a[z]-np.mean(a))*(b[z]-np.mean(b))
     denominator = len(a)*np.std(a)*np.std(b)
 
     if (denominator == 0):
@@ -175,12 +177,9 @@ def predict(prices, clusters):
 
 def fit_weights(training_data, ys):
     # S&Z doesn't specify a lambda/alpha value, TODO experiment
-    lasso = sklearn.linear_model.Lasso(alpha = 0.000000000001)
+    lasso = sklearn.linear_model.Lasso(alpha = 0.00000001)
 
     lasso.fit(training_data, ys)
-
-    print (lasso.coef_)
-    print (lasso.intercept_)
 
     return lasso.intercept_ + lasso.coef_ 
 
@@ -209,9 +208,6 @@ def train(training_data, clusters):
         vals[i-720][0:4] = [p1,p2,p3,r]
         results[i-720][0] = deltap
 
-    print vals
-    print results
-
     weights = fit_weights(vals, results)
 
     return weights
@@ -233,11 +229,6 @@ if __name__=="__main__":
 
     # cluster the first part of data
     clusters = cluster(cluster_data)
-
-    print("TRAIN DATA:")
-    print(train_data)
-    print("CLUSTERS:")
-    print(clusters)
 
     # fit params using second part of data
     weights = train(train_data, clusters)
