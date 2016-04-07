@@ -100,9 +100,9 @@ def cluster(data):
         hp60.append((i,kmeans60[0][i,-1]))
         hp120.append((i,kmeans120[0][i,-1]))
 
-    hp30 = sorted(hp30, key=lambda x: x[1])[0:num_selected_clusters]
-    hp60 = sorted(hp60, key=lambda x: x[1])[0:num_selected_clusters]
-    hp60 = sorted(hp120, key=lambda x: x[1])[0:num_selected_clusters]
+    hp30 = sorted(hp30, reverse=True, key=lambda x: x[1])[0:num_selected_clusters]
+    hp60 = sorted(hp60, reverse=True, key=lambda x: x[1])[0:num_selected_clusters]
+    hp60 = sorted(hp120, reverse=True, key=lambda x: x[1])[0:num_selected_clusters]
 
     # Select the highest performing clusters
     top30 = np.zeros((num_selected_clusters,181))
@@ -137,7 +137,9 @@ def similarity(a, b):
     elif len(a) == len(b) == 0:
 	raise Exception("Vectors are empty")
 
-    numerator = np.sum((np.subtract(a, np.mean(a)))*(np.subtract(b, np.mean(b))))
+    numerator = 0
+    for z in range(0, len(a)):
+        numerator += (a[z]-np.mean(a))*(b[z]-np.mean(b))
     denominator = len(a)*np.std(a)*np.std(b)
 
     if (denominator == 0):
@@ -161,7 +163,7 @@ def predict(prices, clusters):
         raise Exception ("Vector is wrong size: "+str(len_interval))
 
     # S&Z doesn't discuss how to select c, TODO experiment
-    c, numerator, denominator = 1, 0, 0
+    c, numerator, denominator = -1, 0, 0
 
     for i in range(0, num_clusters):
         distance = np.exp(c*similarity(prices, clusters[i][0:len_interval]))
@@ -173,12 +175,14 @@ def predict(prices, clusters):
 
 def fit_weights(training_data, ys):
     # S&Z doesn't specify a lambda/alpha value, TODO experiment
-    lasso = sklearn.linear_model.Lasso(alpha = 1.0)
+    lasso = sklearn.linear_model.Lasso(alpha = 0.000000000001)
 
     lasso.fit(training_data, ys)
 
     print (lasso.coef_)
     print (lasso.intercept_)
+
+    return lasso.intercept_ + lasso.coef_ 
 
 
 def train(training_data, clusters):
@@ -188,8 +192,8 @@ def train(training_data, clusters):
         ∆p = w₀ + w₁∆p₁ + w₂∆p₂ + w₃∆p₃ + w₄r
     """
 
-    vals = np.zeros((len(training_data)-719,4))
-    results = np.zeros((len(training_data)-719,1))
+    vals = np.zeros((len(training_data)-721,4))
+    results = np.zeros((len(training_data)-721,1))
 
     # Iterate through training data, at each point try to predict price
     seq = lambda n: [x[1] for x in training_data[i-n:i]]
