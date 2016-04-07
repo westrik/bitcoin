@@ -31,9 +31,8 @@ Training and usage:
        trade decision
 """
 
-import csv
 import sys
-
+import pickle
 import numpy as np
 import sklearn
 import sklearn.cluster
@@ -70,11 +69,11 @@ def split_into_intervals(data, n):
 
     # each datapoint we're trying to cluster will be of the form:
     #     (xi,yi) = (time series of prices, price change after series)
-    intervals = np.zeros((len(prices)-1,m+2))
+    intervals = np.zeros((len(prices)-1,m+1))
 
     for i in range(0, len(prices)-m-1):
         intervals[i,0:m] = prices[i:i+m]
-        intervals[i,m+1] = price_diffs[i+m]
+        intervals[i,m] = price_diffs[i+m]
 
     return intervals
 
@@ -111,9 +110,9 @@ def cluster(data):
     top120 = np.zeros((num_selected_clusters,721))
 
     for i in range(0, num_selected_clusters):
-        top30[i,0:180] = kmeans30[0][hp30[i][0],0:181]
-        top60[i,0:360] = kmeans60[0][hp60[i][0],0:361]
-        top120[i,0:720] = kmeans120[0][hp120[i][0],0:721]
+        top30[i,0:181] = kmeans30[0][hp30[i][0],0:181]
+        top60[i,0:361] = kmeans60[0][hp60[i][0],0:361]
+        top120[i,0:721] = kmeans120[0][hp120[i][0],0:721]
 
     # Then normalize the clusters so we can use the faster similarity function
     #    from S&Z to compare instead of L2 norm
@@ -138,8 +137,8 @@ def similarity(a, b):
     elif len(a) == len(b) == 0:
 	raise Exception("Vectors are empty")
 
-    numerator = np.sum((np.subtract(a[0:-1], np.mean(a[0:-1])))*(np.subtract(b, np.mean(b))))
-    denominator = len(a[0:-1])*np.std(a[0:-1])*np.std(b)
+    numerator = np.sum((np.subtract(a, np.mean(a)))*(np.subtract(b, np.mean(b))))
+    denominator = len(a)*np.std(a)*np.std(b)
 
     if (denominator == 0):
        return numerator
@@ -158,24 +157,28 @@ def predict(prices, clusters):
     num_clusters = len(clusters)
     len_interval = len(prices)
 
-    if len_interval == 720:
-        cluster = 2
-    elif len_interval == 360:
-        cluster = 1
-    elif len_interval == 180:
-        cluster = 0
-    else:
+    if len(prices) != len(clusters[0])-1:
         raise Exception ("Vector is wrong size: "+str(len_interval))
 
     # S&Z doesn't discuss how to select c, TODO experiment
     c, numerator, denominator = 1, 0, 0
 
     for i in range(0, num_clusters):
-        distance = np.exp(c*similarity(prices, clusters[cluster][0:len_interval]))
-        numerator += distance*prices[-1]
+        distance = np.exp(c*similarity(prices, clusters[i][0:len_interval]))
+        numerator += distance*clusters[i][-1]
         denominator += distance
 
-    return (numerator / denominator)
+    return(numerator / denominator)
+
+
+def fit_weights(training_data, ys):
+    # S&Z doesn't specify a lambda/alpha value, TODO experiment
+    lasso = sklearn.linear_model.Lasso(alpha = 1.0)
+
+    lasso.fit(training_data, ys)
+
+    print (lasso.coef_)
+    print (lasso.intercept_)
 
 
 def train(training_data, clusters):
@@ -185,25 +188,35 @@ def train(training_data, clusters):
         ∆p = w₀ + w₁∆p₁ + w₂∆p₂ + w₃∆p₃ + w₄r
     """
 
-    vals = np.zeros((len(training_data)-720,4))
+    vals = np.zeros((len(training_data)-719,4))
+    results = np.zeros((len(training_data)-719,1))
 
     # Iterate through training data, at each point try to predict price
     seq = lambda n: [x[1] for x in training_data[i-n:i]]
-    for i in range(720, len(training_data)):
+    for i in range(720, len(training_data)-1):
         p1 = predict(seq(180), clusters[0])
         p2 = predict(seq(360), clusters[1])
         p3 = predict(seq(720), clusters[2])
         ask = training_data[i][2]
         bid = training_data[i][3]
         r = (bid-ask)/(bid+ask)
+        deltap = training_data[i+1][1] - training_data[i][1]
 
-        vals[i][0:3] = [p1,p2,p3,r]
+        vals[i-720][0:4] = [p1,p2,p3,r]
+        results[i-720][0] = deltap
+
+    print vals
+    print results
+
+    weights = fit_weights(vals, results)
+
+    return weights
 
 
 # Train the model
 if __name__=="__main__":
     if (len(sys.argv)) == 1:
-        print "Need csv"
+        print "Need csv with training data"
         quit()
 
     # load dataset
@@ -217,8 +230,14 @@ if __name__=="__main__":
     # cluster the first part of data
     clusters = cluster(cluster_data)
 
+    print("TRAIN DATA:")
+    print(train_data)
+    print("CLUSTERS:")
+    print(clusters)
+
     # fit params using second part of data
     weights = train(train_data, clusters)
 
     # save weights and clusters for later usage
-    # ... TODO
+    pickle.dump(clusters, open("clusters.pickle", "wb"))
+    pickle.dump(weights,  open("weights.pickle", "wb"))
