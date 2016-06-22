@@ -1,5 +1,7 @@
 from train import *
 
+import pickle as pkl
+
 def test_trading(data, clusters):
     # iterate over test data,
     # making decisions at each time step
@@ -47,8 +49,8 @@ if __name__=="__main__":
 
     # load clusters and weights
     try:
-        clusters = pickle.load(open("weights/clusters.pickle", "rb"))
-        weights = pickle.load(open("weights/weights.pickle", "rb"))
+        clusters = pkl.load(open("weights/clusters.pkl", "rb"))
+        weights = pkl.load(open("weights/weights.pkl", "rb"))
         #weights = [0.02085571, -1.1125847, 0.09749599, -1.56908484, 0.00331902]
         #weights = [-0.00570016, -0.2617486, -0.63571931, 0.13415341, 0.00337089]
     except:
