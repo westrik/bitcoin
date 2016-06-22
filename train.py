@@ -32,7 +32,7 @@ Training and usage:
 """
 
 import sys
-import pickle
+import pickle as pkl
 import numpy as np
 import sklearn
 import sklearn.cluster
@@ -234,5 +234,5 @@ if __name__=="__main__":
     weights = train(train_data, clusters)
 
     # save weights and clusters for later usage
-    pickle.dump(clusters, open("weights/clusters.pickle", "wb"))
-    pickle.dump(weights,  open("weights/weights.pickle", "wb"))
+    pkl.dump(clusters, open("weights/clusters.pkl", "wb"))
+    pkl.dump(weights,  open("weights/weights.pkl", "wb"))
